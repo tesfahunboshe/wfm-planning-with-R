@@ -1,0 +1,628 @@
+---
+title: "Workforce Management Planning with R"
+author: "Tesfahun Tegene Boshe, Alparslan Erol"
+date: "08/01/2022"
+output: 
+  html_document:
+    toc: true
+    toc_depth: 3
+    toc_float: true
+    code_folding: show
+    keep_md: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(message = FALSE)
+knitr::opts_chunk$set(warning = FALSE)
+```
+
+# Introduction
+
+This project is based on the real-life tasks of the group members. We would like to create a working workforce management plan for MIINTO TECH using the company’s internal data. Visualization is an important part of workforce management, therefore, we would like to apply visualization techniques covered in the lecture to infer knowledge from the dataset. 
+
+MIINTO is Danish online luxury shopping platform business across many European markets. Its Polish brand is commonly known as SHOWROOM. MIINTO has its customer service in Warsaw, where one of us also works as workforce manager. A workforce manager is responsible for forecasting the contact volume and staffing appropriate number of heads for the call center. It Is therefore important to forecast the business volume, the inquiry rate, the number of contacts per channel and later the number of heads per interval for healthy customer experience.
+
+We will be planning the first quarter of the year 2022. This is supposed to be done at least few months earlier than the Jan 2022, hence coinciding with the time span of this project. 
+
+We intend to make informative visualization of the data across the calculation steps. The insights from the visualization will be necessary for the decisions the workforce manager makes.
+
+
+## Dataset
+
+Loading the dataset
+
+```{r}
+
+data_contact <- read.csv("contacts.csv")
+data_transactions <- read.csv("orders.csv", dec = ".")
+```
+
+Let's install and load all the necessary packages
+```{r}
+
+requiredPackages = c("tidyverse","ggplot2", "ggthemes", "forecast" ,"TTR", "dplyr", "fpp2", "xts","lubridate",
+                     "ggpubr","forestmangr","DT","ggpubr", "ggstatsplot","rnaturalearth")
+
+for(i in requiredPackages){if(!require(i,character.only = TRUE)) install.packages(i)}
+for(i in requiredPackages){if(!require(i,character.only = TRUE)) library(i,character.only = TRUE)}
+
+```  
+
+
+## Preleminary Analysis
+
+let's start with the contacts data. 
+
+![Data description](./image.jpg)
+
+
+```{r}
+
+head(data_contact)
+colnames(data_contact)[1] <- c("ID") # rename the first column to a proper name. 
+
+str(data_contact) 
+
+```
+
+Plot1: number of contacts per market per channel.. color being native/ENG
+
+## 1
+```{r}
+# ggplot(data = data_contact %>% group_by(Market, Channel, Native.ENG) %>% summarise(N = n()),
+#        aes(x = Market, y = N, fill = Channel, colour = Native.ENG)) +
+#   geom_bar(stat = "identity", position = position_dodge(0.9)) +
+#   geom_text(
+#     aes(label = N, group = Channel),
+#     position = position_dodge(0.9),
+#     vjust = -0.3, size = 2.5,
+#     color = "black"
+#   ) +   
+#   labs(title = 'Number of contacts per market per channel with Native.ENG?',
+#        # subtitle = '',
+#        caption = 'Source: MIINTO Company') +
+#   xlab("Market Countries") +
+#   ylab("Number of Contacts") +
+#   theme_minimal() +
+#   theme(legend.position = "right") +
+#   guides(colour = guide_legend(override.aes = list(shape = 15, alpha = 1, size = 8)))
+```
+
+## 2
+```{r}
+ggplot(data = data_contact %>% group_by(Market, Channel) %>% summarise(N = n()), aes(x = Market, y = N, fill = Channel)) +
+  geom_bar(stat = "identity", position = position_dodge(0.9)) +
+  geom_text(
+    aes(label = N, group = Channel),
+    position = position_dodge(0.9),
+    vjust = -0.3, size = 2.5,
+    color = "black"
+  ) +     
+  labs(title = 'Contacts per Market per channel',
+       # subtitle = '',
+       caption = 'Source: MIINTO Company') +
+  xlab("Market Countries") +
+  ylab("Number of Contacts") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  guides(colour = guide_legend(override.aes = list(shape = 15, alpha = 1, size = 8)))
+```
+
+## 3
+```{r}
+ggplot(data = data_contact %>% group_by(Market, Native.ENG) %>% summarise(N = n()), aes(x = Market, y = N, fill = Native.ENG)) +
+  geom_bar(stat = "identity", position = position_dodge(0.9)) +
+  geom_text(
+    aes(label = N, group = Native.ENG),
+    position = position_dodge(0.9),
+    vjust = -0.3, size = 2.5,
+    color = "black"
+  ) +     
+  labs(title = 'Native vs ENG contacts per market',
+       # subtitle = '',
+       caption = 'Source: MIINTO Company') +
+  xlab("Market Countries") +
+  ylab("Number of Contacts") +
+  theme_minimal() +
+  theme(legend.position = "right") +
+  guides(colour = guide_legend(override.aes = list(shape = 15, alpha = 1, size = 8)))
+```
+
+Plot2: Average Handling time per market per channel
+
+```{r}
+data_contact %>% 
+  group_by(Market, Channel) %>%
+    summarise(Mean = round(mean(handling_duration, na.rm = T), 2))
+```
+```{r}
+# ggplot(data = data_contact, aes(y = total_duration, x = Market, fill = Channel)) +
+#   geom_boxplot()
+```
+
+```{r}
+# ggplot(data_contact %>% 
+#         group_by(Market, Channel) %>%
+#           summarise(Mean = round(mean(handling_duration, na.rm = T), 2)),
+#        aes(x = Market, y = Channel)) + 
+#   geom_tile(fill = 'white', color = 'black', show.legend = F) +
+#   geom_point(aes(fill = Mean, size = Mean), shape = 21, color = 'black',
+#              show.legend = F) +
+#   theme_minimal() + 
+#   geom_text(aes(label = Mean), size = 4, fontface = 'bold',
+#             color = 'white') +
+#   labs(title = 'Table 1. Interesing title.')+
+#   theme(panel.grid = element_blank()) +
+#   scale_size(range = c(20, 30))
+```
+
+
+```{r}
+# ggplot(data_contact %>% 
+#         group_by(Market, Channel) %>%
+#           summarise(Mean = round(mean(handling_duration, na.rm = T), 2)),
+#        aes(Market, Channel)) + theme_grey(base_size = 9) + 
+#   geom_tile(aes(fill = Mean),colour = "white") + 
+#   scale_fill_gradient2(low = "#006400", mid = "#f2f6c3", high = "#cd0000", midpoint = 0.5) +
+#   theme(legend.title = element_blank(), legend.position = 'top', legend.text = element_blank(),
+#         axis.text.x = element_text(angle = 330, hjust = 0), axis.title = element_blank())
+```
+
+```{r}
+ggdotchart(data_contact %>% 
+            group_by(Market, Channel) %>%
+              summarise(Mean = round(mean(handling_duration, na.rm = T), 2)),
+           x = "Market", y = "Mean", color = "Channel",                                
+           palette = c("#00AFBB", "#E7B800", "#FC4E07"), 
+           sorting = "descending",                       
+           rotate = TRUE,                                
+           dot.size = 2,                                
+           y.text.col = TRUE) + 
+  theme_cleveland()  
+```
+
+
+```{r}
+data_contact_xts <- xts(data_contact[,-2], # time series
+                      as.Date(data_contact$created_at))
+```
+
+```{r}
+data_contact %>% group_by(DateCreated) %>% summarise(N = n())
+```
+
+Let's also analyze the transactions data. 
+
+```{r}
+str(data_transactions)
+
+
+colnames(data_transactions)[1] <- c("Date") # rename the first column to a proper name. 
+
+```
+
+
+# Forecasting the future contacts volume
+
+This is the first big part of the workforce management planning. The historical volume of contacts together with the forecast of future transactions is used to calculate the future contacts. Therefore, it is necessary to first forecast the future transactions for Jan 2022. 
+
+However, since the purpose of this task is mainly visualization, we will go ahead and use the already calculated forecast data.
+
+```{r}
+transcations_Jan2022 <- read.csv("orders_Jan2022.csv")
+
+# library(forestmangr)
+
+transcations_Jan2022 <- forestmangr::round_df(transcations_Jan2022) # ROUND all numberic values to the nearest integer. 
+datatable(transcations_Jan2022,caption='Table 1. XXXXXXX',
+            rowname = F,
+            filter = 'top')
+
+# let's change the numbers to the nearest integers, since transaction. 
+
+
+```
+
+Plot4: 
+
+```{r}
+
+```
+
+
+### Contact volumes for Jan 2022. 
+Let's also calculate the forecast of contact volume for the same period. 
+
+The contact volume can be assumed to be directly proportional to the transactions volume. Therefore, finding the average transaction to contact ratio from the year 2021, we can calculate the contacts volume for year 2022. This is of course ignoring the dynamism due to special events, holiday season and such. The common practice is, however, to readjust the volumes after the calculation to fit to the seasonality in the period. 
+
+Calculating transactions to contacts ratio of  the previous year, per market. 
+
+Total Transactions per market
+```{r}
+
+total_transactions <-colSums(data_transactions[,-1])
+total_transactions
+```
+
+
+Total Contacts per market per channel
+```{r}
+total_contacts <- data_contact %>% group_by(Market, Channel) %>% summarise(
+                                                                Total_2021 = n())
+
+
+
+```
+
+Contact to transaction ratio
+```{r}
+
+Markets <- colnames(data_transactions[,-1])
+Channels <- c("Chat", "Phone", "Email")
+ 
+tran_cont_ratios <- list() # store the ratios here, 
+
+# for loop for calculating ratio in loop
+for (market in Markets)
+{
+  for (channel in Channels)
+  {
+    tran_cont_ratios[paste(market, channel)] <-  total_contacts$Total_2021[total_contacts$Market==sub('\\.','/',market) & total_contacts$Channel==channel]/total_transactions[market] # contact/transaction
+  }
+}
+
+(tran_cont_ratios_df <- data.frame(tran_cont_ratios))
+
+```
+
+
+Let's calculate the contacts for Jan 2022 using the calculated ratios. The contacts will be the product of the ratio calculated and transactions forecast above. 
+
+```{r}
+
+forecast_2022 <- c(channel1=0,channel2=0,channel3=0)
+forcasts_thischanel <- data.frame(matrix(ncol = 10, nrow = 31)) # empty dataframe with 10 cols, 31 rows
+colnames(forcasts_thischanel) <- c("Date","Channel", colnames(transcations_Jan2022)[2:9])
+
+# total_contacts$Total_2022 <- 0
+i = 0
+for (channel in Channels)
+{
+  i = i+1
+  for (market in Markets)
+  {
+    for (day in seq(1,31,1))
+      
+    {
+      forcasts_thischanel[market][day,]= transcations_Jan2022[market][day,]*tran_cont_ratios_df[sub(' ','.',paste(sub('/','\\.',market),channel))]
+      forcasts_thischanel$Channel[day]= channel
+      forcasts_thischanel$Date[day]= day
+      
+    }
+    
+  }
+  if(channel=="Email")
+  {
+    forecast_Email <- forcasts_thischanel
+  }
+   if(channel=="Phone")
+  {
+    forecast_Phone <- forcasts_thischanel
+   }
+   if(channel=="Chat")
+  {
+    forecast_Chat <- forcasts_thischanel
+  }
+}
+
+forecast_Jan_2022 <- rbind(forecast_Email,forecast_Phone,forecast_Chat)
+```
+
+Plot 6
+```{r}
+
+
+```
+
+
+# Resource Planning 
+
+This is the most important section of workforce management, because at this stage, we will figure out the amount of staffing we will need and allocate the workforce to appropriate markets and channels. 
+
+First however, we will need to establish some assumptions about the capacity of an average agent. We will assume the average number of conversations that can be handled within 1 hour of shift time. This assumption puts into account the unoccupied time between conversations, for well needed break or other reasons. 
+
+## Capacity Assumptions
+
+Average Handling Time
+```{r}
+AHT_chat <- 10 # minutes
+AHT_email <- 6 # minutes
+AHT_Phone <- 8 # minutes
+
+```
+
+Service Level
+```{r}
+SL_chat <- 0.9 # 90 %percent
+SL_email <- 1 # 100 %percent
+SL_Phone <- 0.9 # 90 %percent
+
+SLA_time_chat<- 60 # sec
+SLA_time_Phone <- 60 # sec
+SLA_time_Phone <- 60*12*60 # sec = 12 hrs
+
+```
+
+## Arrival Pattern
+
+We will need to change the volume to per-hour interval numbers. It is therefore important to discover the arrival pattern from the historical data. 
+
+```{r}
+
+ggboxplot(data_contact, x = "Channel", y = "TimeCreated",
+          color = "Channel", palette = "jco",
+          add = "jitter", facet.by = "Market", short.panel.labs = FALSE)
+
+```
+
+
+
+```{r}
+Arrival_pattern <- data_contact %>% group_by(Market, Channel,TimeCreated) %>% summarise(Count = n())%>%
+  mutate(freq = round(Count / sum(Count), 3)) # rounded to 3 decimal places
+
+head(Arrival_pattern)
+```
+
+Plot5: Arrival pattern - per market. (selected markets)
+```{r}
+
+
+```
+
+
+
+
+## Volume in hour-by-hour intervals
+
+```{r}
+
+Days = seq(1,31,1) # for days in Jan
+ContactPerInterval <- data.frame(matrix(ncol = 5, nrow = 0)) # empty dataframe with 5 cols, 31 rows
+colnames(ContactPerInterval) <- c("Market","Channel","Date","Time", "Volume")
+
+for (market in Markets)
+{
+  for (channel in Channels)
+  {
+    
+    for (day in Days)
+    {
+      for (time_int in seq(1:24)) 
+      {
+        vector = Arrival_pattern$Market==market & Arrival_pattern$Channel==channel & Arrival_pattern$TimeCreated==time_int
+        ContactPerInterval[nrow(ContactPerInterval)+1,] <- c(market, channel,day,time_int,
+                                                           
+         if(sum(vector)==0)
+         {
+           0
+         }
+         else
+           forecast_Jan_2022[market][day,]*Arrival_pattern$freq[vector]
+        )
+          
+      }
+    }
+  }
+}
+
+head(ContactPerInterval,20)
+
+```
+
+## Heads per interval
+
+The next and last calculation is to find the minimum number of heads required to handle the volume. First, we will calculate the numbers per interval, and then combine the heads to find out the actual heads that need to be hired assuming each of them a full-timer. (NB: A full-timer works 8 hrs per day and 40 hrs per week. In customer support centers, some of those days can also be weekend days)
+
+We will, however, need to calculate per interval heads first. It is important to remember that that we have 3 channels, each of them with different handling time, service level agreement and arrival pattern. Sequential contacts like email contacts can be handled in sequential manner, whereas the dynamic contacts such as chat and phone call need an immediate answering. This is because customers do not wait on the line, usually longer than a couple of minutes. Longer waiting usually translates to bad customer experience. 
+
+We will define two separate functions, each calculating the number of Erlangs(Erlangs are the number of worked hours, also equal to number of heads when the interval is 1 hour) per interval. 
+
+a. Dynamic contacts
+The assumption is that contacts arrive in *Poisson distribution*. 
+
+```{r}
+
+ ## Erlang-C Functions from https://lucidmanager.org/data-science/call-centre-workforce-planning-erlang-c-in-r/
+  intensity <- function(rate, duration, interval = 60) {
+      (rate / interval) * duration
+  }
+
+  erlang_c <- function(agents, rate, duration, interval = 60) {
+      int <- intensity(rate, duration, interval)
+      erlang_b_inv <- 1
+      for (i in 1:agents) {
+          erlang_b_inv <- 1 + erlang_b_inv * i / int
+      }
+      erlang_b <- 1 / erlang_b_inv
+      agents * erlang_b / (agents - int * (1 - erlang_b))
+  }
+
+  service_level <- function(agents, rate, duration, target, interval = 60) {
+      pw <- erlang_c(agents, rate, duration, interval)
+      int <- intensity(rate, duration, interval)
+      1 - (pw * exp(-(agents - int) * (target / duration)))
+  }
+
+  resource <- function(rate, duration, target, gos_target, interval = 60) {
+      agents <- round(intensity(rate, duration, interval) + 1)
+      gos <- service_level(agents, rate, duration, target, interval)
+      while (gos < gos_target * (gos_target > 1) / 100) {
+          agents <- agents + 1
+          gos <- service_level(agents, rate, duration, target, interval)
+      }
+      return(agents)
+  }
+
+```
+
+Let's find the part of our 'ContactPerInterval' for our dynamic contacts. 
+
+```{r}
+ContactPerInterval_dynamic <- ContactPerInterval%>% filter(Channel %in% c("Phone","Chat"))
+
+```
+
+Let's apply the resources function defined above on all dynamic contacts volume. 
+
+```{r}
+
+ContactPerInterval_dynamic$resources <- lapply(as.numeric(ContactPerInterval_dynamic$Volume), 
+                                               resource,duration = 60, target=60, gos_target=0.9, interval = 60)
+
+```
+
+b. Sequential Contacts
+- Sequential contacts are handled in a sequence. They usually have longer service time. We will assume it to be 24 hrs, so that all emails get replied to within the first day of delivery. 
+
+```{r}
+
+ContactPerInterval_sequential <- ContactPerInterval%>% filter(Channel =="Email")
+```
+
+```{r}
+
+ContactPerInterval_sequential$resources <- as.numeric(ContactPerInterval_sequential$Volume)/(60/AHT_email) # 60/AHT  = productivity per head per hour
+```
+
+Let's combine the two dataframes and find average heads per interval for the whole month. 
+
+```{r}
+heads_day_interval <- rbind(ContactPerInterval_dynamic,ContactPerInterval_sequential)
+
+```
+
+```{r}
+Avg_heads_interval <- heads_day_interval %>% group_by(Market, Channel, Time) %>% summarize(Resources = ceiling(mean(as.numeric(resources)))) # round up since heads
+
+Avg_heads_interval <- Avg_heads_interval[with(Avg_heads_interval, order(Market,Channel,Time)),] # sorted by time
+
+
+```
+
+```{r}
+
+ggplot(data = Avg_heads_interval) + 
+  geom_col(aes(x = as.numeric(Time), y = Resources), fill = "tomato4") + 
+  facet_grid(Channel ~ .)+
+  labs(title= "Required resources per interval")+
+  scale_x_continuous(name = "Time", 
+                        breaks = seq(1,24,1),
+                        labels = seq(1,24,1))
+  
+```
+
+
+## Hiring Plan
+We have calculated the required number of heads per interval. This is not the last step, as we have to also translate the per interval numbers into full-time equivalents. 
+An FTE is an abbreviation to a full time equivalent. For example, when it comes to a week, an FTE is equal to an agent who works 40 hrs (at least in Poland). A daily FTE is an agent who works 8 hrs. 
+
+Daily FTEs requirement per market per channel
+
+```{r}
+Avg_heads_daily <- heads_day_interval %>% group_by(Market, Channel, Date) %>% summarize(Resources = sum(as.numeric(resources)/8)) # 8 hrs an FTE's daily [hr]
+
+datatable(Avg_heads_daily,caption='Table 1. XXXXXXX',
+            rowname = F,
+            filter = 'top')
+
+```
+
+Weekly FTEs requirement per market per channel
+
+```{r}
+Avg_heads_daily$Day_of_week <- (as.numeric(Avg_heads_daily$Date) %% 7) +1 
+Avg_heads_daily_1_week <- Avg_heads_daily %>% group_by(Market, Channel, Day_of_week) %>% summarize(Resources = mean(Resources))
+
+```
+
+PLot: Required heads Per Day for each channel
+```{r}
+ggplot(data = Avg_heads_daily_1_week, aes(y = Resources, x = Day_of_week, fill = Channel)) +
+  geom_col(show.legend = T)+
+  facet_grid(Channel ~ .)+
+  labs(title= "Total Resources Required")+
+  scale_x_continuous(name = "Day of the week", 
+                        breaks = seq(1,7,1),
+                        labels = c("Sat","Sun","Mon","Tues","Wed","Thur","Fri"))
+
+```
+
+Now we are in a position to know how many heads we need to hire for each channel per market. 
+```{r}
+
+total_heads_required <- Avg_heads_daily_1_week %>% group_by(Market, Channel) %>% summarize(Resources = ceiling(sum(Resources)/5))  # since an FTE works 5 days a week
+datatable(total_heads_required,caption='Table 1. XXXXXXX',
+            rowname = F,
+            filter = 'top')
+```
+
+
+Plot6: Required heads per market (Heat Map)
+
+```{r}
+
+ggplot(total_heads_required, aes(x = Channel, y = Market)) +
+  geom_tile(aes(fill = Resources), color = 'black', show.legend = F) +
+  theme_minimal() + 
+  geom_text(aes(label = Resources), size = 5, fontface = 'bold', color = 'white') +
+  labs(title = 'Required Heads') +
+  scale_fill_gradient(low = 'green3', high = 'orange')
+```
+
+Plot: Heads by market (on Map)
+
+Let's prepare the data
+```{r}
+Total_Heads <- as.data.frame(c(Netherlands = sum(total_heads_required$Resources[total_heads_required$Market=="BENE"]),
+                 Belgium = sum(total_heads_required$Resources[total_heads_required$Market=="BENE"]),
+                 Germany = sum(total_heads_required$Resources[total_heads_required$Market=="DE.CH"]),
+                 Switzerland = sum(total_heads_required$Resources[total_heads_required$Market=="DE.CH"]),
+                 Denmark = sum(total_heads_required$Resources[total_heads_required$Market=="DK"]),
+                 France = sum(total_heads_required$Resources[total_heads_required$Market=="FR"]),
+                 Italy = sum(total_heads_required$Resources[total_heads_required$Market=="ITA.ES"]),
+                 Spain = sum(total_heads_required$Resources[total_heads_required$Market=="ITA.ES"]),
+                 Norway = sum(total_heads_required$Resources[total_heads_required$Market=="NO.UK"]),
+                 United_Kingdom = sum(total_heads_required$Resources[total_heads_required$Market=="NO.UK"]),
+                 Poland = sum(total_heads_required$Resources[total_heads_required$Market=="PL"]),
+                 Sweden = sum(total_heads_required$Resources[total_heads_required$Market=="SE.FI"]),
+                 Finland = sum(total_heads_required$Resources[total_heads_required$Market=="SE.FI"])))
+
+```
+
+```{r}
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+Heads_per_Market <- world %>% 
+  filter(continent == 'Europe')
+Heads_per_Market$Heads <- 0
+
+for (name in rownames(Total_Heads))
+{
+  Heads_per_Market$Heads[Heads_per_Market$sovereignt == name] = Total_Heads[name, ]
+}
+
+```
+
+Plot
+```{r}
+
+ggplot(data = Heads_per_Market) +
+  geom_sf(aes(fill =  Heads)) +
+  scale_fill_viridis_c(option = "plasma", trans = "sqrt", guide = guide_colorbar(barwidth = 30), name = NULL,
+                       labels = format_sep) +
+  coord_sf(xlim = c(-20, 40), ylim = c(30, 70), expand = TRUE) +
+  theme(legend.position = 'bottom')
+```
+
